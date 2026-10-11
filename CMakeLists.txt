@@ -1,293 +1,390 @@
-if(NOT WIN32)
-    string(REPLACE "-static " "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ")
-    string(STRIP "${CMAKE_EXE_LINKER_FLAGS}" CMAKE_EXE_LINKER_FLAGS)
-endif()
-
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    include(CheckPIESupported)
-    check_pie_supported(LANGUAGES C CXX)
-    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-endif()
-
-add_executable(nid_patcher
-        ${CMAKE_CURRENT_SOURCE_DIR}/nid/src/Sha1.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/nid/src/NidCompute.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/nid/src/NidResolver.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/nid/src/ExportExclusions.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/nid/src/ElfNidPatcher.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/nid/src/PeNidPatcher.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/nid/src/MachONidPatcher.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/nid/src/BinaryPatcherFactory.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/nid/src/main.cpp
+add_library(libSceAgc SHARED EXCLUDE_FROM_ALL
+        ${CMAKE_CURRENT_SOURCE_DIR}/Unimplemented.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Acb/src/Control.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Acb/src/Dispatch.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Acb/src/Memory.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Acb/src/Sync.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Cb/src/Branch.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Cb/src/Dispatch.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Cb/src/Registers.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Cb/src/Sync.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Command/src/Memory.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Command/src/Control.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Command/src/Draw.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Command/src/RegisterDefaults.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Command/src/Packet.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/DcbDraw/src/DrawIndexed.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/DcbDraw/src/DrawNonIndexed.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/DcbDraw/src/IndexBuffer.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/DcbDraw/src/Instancing.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/DcbDraw/src/Stats.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/DcbFlow/src/Control.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/DcbFlow/src/Dispatch.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/DcbFlow/src/Memory.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/DcbFlow/src/Sync.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/DcbState/src/ContextState.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/DcbState/src/Display.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/DcbState/src/Init.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/DcbState/src/Marker.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/DcbState/src/Predication.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/DcbState/src/Registers.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/DcbState/src/Workload.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Misc/src/PacketInfo.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Misc/src/Platform.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Misc/src/RegisterDefaults.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Misc/src/ShaderFusion.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Misc/src/Suspend.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Patch/src/CondExec.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Patch/src/Dma.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Patch/src/IndirectRegisters.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Patch/src/Jump.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Patch/src/Nop.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Patch/src/QueueEndOfPipeAction.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Patch/src/Rewind.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Patch/src/WaitRegMem.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Patch/src/Branch.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Predication/src/Predication.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Shader/src/CreateShader.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Shader/src/GsOversubscription.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Shader/src/InterpolantMapping.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Shader/src/LinkShaders.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Shader/src/PrimState.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Shader/src/ShaderUtils.cpp
 )
 
-target_include_directories(nid_patcher PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/nid/include)
-target_compile_features(nid_patcher PRIVATE cxx_std_20)
+target_include_directories(libSceAgc PRIVATE ${LIBS_INCLUDE_DIR})
+target_link_libraries(libSceAgc PRIVATE libSceAgcDriver libc)
 
-if(MINGW)
-    target_link_options(nid_patcher PRIVATE -static -static-libgcc -static-libstdc++)
-    add_compile_options(-fno-asynchronous-unwind-tables)
-endif()
+option(APS5_AGC_CREATE_LOG "Logging sceAgcCreateShader Ok status" ON)
 
-function(configure_windows_unwind target)
-    if(MINGW)
-        if(NOT EXISTS "${CMAKE_OBJCOPY}")
-            message(FATAL_ERROR "Windows DWARF unwinding requires objcopy")
-        endif()
-        add_custom_command(TARGET ${target} POST_BUILD
-                COMMAND "${CMAKE_OBJCOPY}" --rename-section .eh_frame=.ehfram "$<TARGET_FILE:${target}>"
-                VERBATIM
-        )
-    endif()
-endfunction()
-
-if(MINGW)
-    foreach(runtimeLinkFlag IN ITEMS -static-libgcc -static-libstdc++ -static)
-        string(REPLACE "${runtimeLinkFlag}" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
-    endforeach()
-endif()
-
-set(LIBC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/prx/libc)
-add_library(libc SHARED EXCLUDE_FROM_ALL)
-set(LIBS_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
-add_subdirectory(${LIBC_DIR} ${CMAKE_CURRENT_BINARY_DIR}/prx/libc)
-target_include_directories(libc PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-configure_windows_unwind(libc)
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    target_link_options(libc PRIVATE LINKER:-z,now)
-endif()
-
-set(UNPATCHED_DIR ${CMAKE_CURRENT_BINARY_DIR}/libs/unpatched)
-set(PATCHED_DIR ${CMAKE_CURRENT_BINARY_DIR}/libs)
-set(IMPLIB_DIR ${PATCHED_DIR}/implib)
-
-set_target_properties(libc PROPERTIES
-        PREFIX ""
-        SUFFIX .prx
-        RUNTIME_OUTPUT_DIRECTORY ${UNPATCHED_DIR}
-        LIBRARY_OUTPUT_DIRECTORY ${UNPATCHED_DIR}
-        ARCHIVE_OUTPUT_DIRECTORY ${IMPLIB_DIR}
-        BUILD_WITH_INSTALL_RPATH ON
-        INSTALL_RPATH "$ORIGIN"
+target_compile_definitions(libSceAgc PRIVATE
+        APS5_AGC_CREATE_LOG=$<BOOL:${APS5_AGC_CREATE_LOG}>
 )
 
-set(LIBC_UNPATCHED ${UNPATCHED_DIR}/libc.prx)
-set(LIBC_PATCHED ${PATCHED_DIR}/libc.prx)
-
-add_custom_command(
-        OUTPUT ${LIBC_PATCHED}
-        COMMAND ${CMAKE_COMMAND} -E copy ${LIBC_UNPATCHED} ${LIBC_PATCHED}
-        COMMAND $<TARGET_FILE:nid_patcher> libc ${LIBC_PATCHED}
-        DEPENDS nid_patcher libc ${LIBC_UNPATCHED}
-        COMMENT "Patching NIDs for libc"
-)
-
-file(GLOB LIBS_DIRS LIST_DIRECTORIES true ${CMAKE_CURRENT_SOURCE_DIR}/prx/*)
-list(REMOVE_ITEM LIBS_DIRS ${LIBC_DIR})
-
-set(PATCHED_OUTPUTS ${LIBC_PATCHED})
-
-foreach(LIB_DIR ${LIBS_DIRS})
-    if(IS_DIRECTORY ${LIB_DIR})
-        get_filename_component(LIB_NAME ${LIB_DIR} NAME)
-
-        if(EXISTS ${LIB_DIR}/CMakeLists.txt)
-            set(LIBS_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
-            add_subdirectory(${LIB_DIR} ${CMAKE_CURRENT_BINARY_DIR}/prx/${LIB_NAME})
-        else()
-            add_library(${LIB_NAME} SHARED EXCLUDE_FROM_ALL ${LIB_DIR}/Export.cpp)
-            target_include_directories(${LIB_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-            configure_windows_unwind(${LIB_NAME})
-        endif()
-
-        if(LIB_NAME STREQUAL "libkernel")
-            target_link_libraries(${LIB_NAME} PRIVATE libc)
-        else()
-            target_link_libraries(${LIB_NAME} PRIVATE libkernel libc)
-        endif()
-        if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-            target_link_options(${LIB_NAME} PRIVATE LINKER:-z,now)
-        endif()
-        if(WIN32 AND LIB_NAME STREQUAL "libSceNet")
-            target_link_libraries(${LIB_NAME} PRIVATE ws2_32)
-            target_compile_definitions(${LIB_NAME} PRIVATE _WIN32_WINNT=0x0602)
-        elseif(WIN32 AND LIB_NAME STREQUAL "libSceNetCtl")
-            target_link_libraries(${LIB_NAME} PRIVATE ws2_32 iphlpapi)
-            target_compile_definitions(${LIB_NAME} PRIVATE _WIN32_WINNT=0x0602)
-        endif()
-
-        set_target_properties(${LIB_NAME} PROPERTIES
-                PREFIX ""
-                SUFFIX .prx
-                RUNTIME_OUTPUT_DIRECTORY ${UNPATCHED_DIR}
-                LIBRARY_OUTPUT_DIRECTORY ${UNPATCHED_DIR}
-                ARCHIVE_OUTPUT_DIRECTORY ${IMPLIB_DIR}
-                BUILD_WITH_INSTALL_RPATH ON
-                INSTALL_RPATH "$ORIGIN"
-        )
-
-        set(UNPATCHED_FILE ${UNPATCHED_DIR}/${LIB_NAME}.prx)
-        set(PATCHED_FILE ${PATCHED_DIR}/${LIB_NAME}.prx)
-
-        add_custom_command(
-                OUTPUT ${PATCHED_FILE}
-                COMMAND ${CMAKE_COMMAND} -E copy ${UNPATCHED_FILE} ${PATCHED_FILE}
-                COMMAND $<TARGET_FILE:nid_patcher> ${LIB_NAME} --preserve-exports "${LIBC_UNPATCHED}" "${PATCHED_FILE}"
-                DEPENDS nid_patcher ${LIB_NAME} ${UNPATCHED_FILE} ${LIBC_UNPATCHED}
-                COMMENT "Patching NIDs for ${LIB_NAME}"
-        )
-
-        list(APPEND PATCHED_OUTPUTS ${PATCHED_FILE})
-    endif()
+foreach(runtimeLinkFlag IN ITEMS -static-libgcc -static-libstdc++ -static)
+    string(REPLACE "${runtimeLinkFlag}" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
 endforeach()
 
-add_custom_target(libs DEPENDS ${PATCHED_OUTPUTS})
+add_test_executable(agc_command_tests EXCLUDE_FROM_ALL tests/Commands.cpp)
+target_include_directories(agc_command_tests PRIVATE ${LIBS_INCLUDE_DIR})
+target_link_libraries(agc_command_tests PRIVATE libSceAgc libc)
+configure_windows_unwind(agc_command_tests)
+if(BUILD_TESTING)
+    set_target_properties(agc_command_tests PROPERTIES EXCLUDE_FROM_ALL OFF)
+    add_test(NAME agc_initialization COMMAND agc_command_tests defaults)
+    add_test(NAME agc_commands COMMAND agc_command_tests)
+    if(WIN32)
+        set_tests_properties(agc_initialization agc_commands PROPERTIES ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:$<TARGET_FILE_DIR:libc>")
+    endif()
+endif()
+configure_windows_unwind(libSceAgc)
+
+add_test_executable(agc_platform_tests EXCLUDE_FROM_ALL tests/Platform.cpp)
+target_include_directories(agc_platform_tests PRIVATE ${LIBS_INCLUDE_DIR})
+target_link_libraries(agc_platform_tests PRIVATE libSceAgc libc)
+configure_windows_unwind(agc_platform_tests)
+if(BUILD_TESTING)
+    set_target_properties(agc_platform_tests PROPERTIES EXCLUDE_FROM_ALL FALSE)
+    add_test(NAME agc_platform_tests COMMAND agc_platform_tests)
+    if(WIN32)
+        set_tests_properties(agc_platform_tests PROPERTIES ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:$<TARGET_FILE_DIR:libc>")
+    endif()
+endif()
+
+add_test_executable(agc_packet_info_tests EXCLUDE_FROM_ALL tests/PacketInfo.cpp)
+target_include_directories(agc_packet_info_tests PRIVATE ${LIBS_INCLUDE_DIR})
+target_link_libraries(agc_packet_info_tests PRIVATE libSceAgc libc)
+configure_windows_unwind(agc_packet_info_tests)
+if(BUILD_TESTING)
+    set_target_properties(agc_packet_info_tests PROPERTIES EXCLUDE_FROM_ALL FALSE)
+    add_test(NAME agc_packet_info_tests COMMAND agc_packet_info_tests)
+    if(WIN32)
+        set_tests_properties(agc_packet_info_tests PROPERTIES ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:$<TARGET_FILE_DIR:libc>")
+    endif()
+endif()
+
+add_test_executable(agc_register_command_tests EXCLUDE_FROM_ALL
+        tests/RegisterCommands.cpp
+        Command/src/Packet.cpp
+        Cb/src/Registers.cpp
+        DcbState/src/Registers.cpp
+        Patch/src/IndirectRegisters.cpp
+)
+target_include_directories(agc_register_command_tests PRIVATE ${LIBS_INCLUDE_DIR})
+target_link_libraries(agc_register_command_tests PRIVATE libc)
+configure_windows_unwind(agc_register_command_tests)
+if(BUILD_TESTING)
+    set_target_properties(agc_register_command_tests PROPERTIES EXCLUDE_FROM_ALL FALSE)
+    add_test(NAME agc_register_command_tests COMMAND agc_register_command_tests)
+    if(WIN32)
+        set_tests_properties(agc_register_command_tests PROPERTIES ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:$<TARGET_FILE_DIR:libc>")
+    endif()
+endif()
+
+add_test_executable(agc_cb_cond_write_tests EXCLUDE_FROM_ALL
+        tests/CbCondWrite.cpp
+        Command/src/Packet.cpp
+        Command/src/Memory.cpp
+        Command/src/Control.cpp
+        Cb/src/Branch.cpp
+)
+target_include_directories(agc_cb_cond_write_tests PRIVATE ${LIBS_INCLUDE_DIR})
+target_link_libraries(agc_cb_cond_write_tests PRIVATE libc)
+configure_windows_unwind(agc_cb_cond_write_tests)
+if(BUILD_TESTING)
+    set_target_properties(agc_cb_cond_write_tests PROPERTIES EXCLUDE_FROM_ALL FALSE)
+    add_test(NAME agc_cb_cond_write_tests COMMAND agc_cb_cond_write_tests)
+    if(WIN32)
+        set_tests_properties(agc_cb_cond_write_tests PROPERTIES ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:$<TARGET_FILE_DIR:libc>")
+    endif()
+endif()
+
+add_test_executable(agc_payload_range_tests EXCLUDE_FROM_ALL tests/PayloadRange.cpp)
+target_include_directories(agc_payload_range_tests PRIVATE ${LIBS_INCLUDE_DIR})
+target_link_libraries(agc_payload_range_tests PRIVATE libSceAgc libc)
+configure_windows_unwind(agc_payload_range_tests)
+if(BUILD_TESTING)
+    set_target_properties(agc_payload_range_tests PROPERTIES EXCLUDE_FROM_ALL FALSE)
+    add_test(NAME agc_payload_range_tests COMMAND agc_payload_range_tests)
+    if(WIN32)
+        set_tests_properties(agc_payload_range_tests PROPERTIES ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:$<TARGET_FILE_DIR:libc>")
+    endif()
+endif()
+
+add_test_executable(agc_end_of_shader_action_size_tests EXCLUDE_FROM_ALL tests/EndOfShaderActionSize.cpp)
+target_include_directories(agc_end_of_shader_action_size_tests PRIVATE ${LIBS_INCLUDE_DIR})
+target_link_libraries(agc_end_of_shader_action_size_tests PRIVATE libSceAgc libc)
+configure_windows_unwind(agc_end_of_shader_action_size_tests)
+if(BUILD_TESTING)
+    set_target_properties(agc_end_of_shader_action_size_tests PROPERTIES EXCLUDE_FROM_ALL FALSE)
+    add_test(NAME agc_end_of_shader_action_size_tests COMMAND agc_end_of_shader_action_size_tests)
+    if(WIN32)
+        set_tests_properties(agc_end_of_shader_action_size_tests PROPERTIES ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:$<TARGET_FILE_DIR:libc>")
+    endif()
+endif()
+
+add_test_executable(agc_branch_patch_tests EXCLUDE_FROM_ALL
+        tests/BranchPatch.cpp
+        Command/src/Packet.cpp
+        Cb/src/Branch.cpp
+        Patch/src/Branch.cpp
+)
+target_include_directories(agc_branch_patch_tests PRIVATE ${LIBS_INCLUDE_DIR})
+target_link_libraries(agc_branch_patch_tests PRIVATE libc)
+configure_windows_unwind(agc_branch_patch_tests)
+if(BUILD_TESTING)
+    set_target_properties(agc_branch_patch_tests PROPERTIES EXCLUDE_FROM_ALL FALSE)
+    add_test(NAME agc_branch_patch_tests COMMAND agc_branch_patch_tests)
+    if(WIN32)
+        set_tests_properties(agc_branch_patch_tests PROPERTIES ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:$<TARGET_FILE_DIR:libc>")
+    endif()
+endif()
+
+add_test_executable(agc_predication_tests EXCLUDE_FROM_ALL
+        tests/Predication.cpp
+        Command/src/Packet.cpp
+        Command/src/Control.cpp
+        DcbState/src/Predication.cpp
+        DcbDraw/src/IndexBuffer.cpp
+        Predication/src/Predication.cpp
+)
+target_include_directories(agc_predication_tests PRIVATE ${LIBS_INCLUDE_DIR})
+target_link_libraries(agc_predication_tests PRIVATE libc)
+configure_windows_unwind(agc_predication_tests)
+if(BUILD_TESTING)
+    set_target_properties(agc_predication_tests PROPERTIES EXCLUDE_FROM_ALL FALSE)
+    add_test(NAME agc_predication_tests COMMAND agc_predication_tests)
+    if(WIN32)
+        set_tests_properties(agc_predication_tests PROPERTIES ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:$<TARGET_FILE_DIR:libc>")
+    endif()
+endif()
+
+add_test_executable(agc_shader_fusion_tests EXCLUDE_FROM_ALL tests/ShaderFusion.cpp)
+target_include_directories(agc_shader_fusion_tests PRIVATE ${LIBS_INCLUDE_DIR} ${CMAKE_SOURCE_DIR}/core/shader/recompiler ${CMAKE_SOURCE_DIR}/3rdparty/Vulkan-Headers/include ${CMAKE_SOURCE_DIR}/3rdparty/SPIRV-Headers/include)
+target_link_libraries(agc_shader_fusion_tests PRIVATE libSceAgc libSceAgcDriver libc)
+set_target_properties(agc_shader_fusion_tests PROPERTIES CXX_EXTENSIONS OFF)
+configure_windows_unwind(agc_shader_fusion_tests)
 
 if(BUILD_TESTING)
-    find_package(Python3 QUIET COMPONENTS Interpreter)
-    if(Python3_Interpreter_FOUND)
-        add_test(NAME nid_patcher_macho COMMAND ${Python3_EXECUTABLE}
-            ${CMAKE_CURRENT_SOURCE_DIR}/nid/tests/test_macho_nids.py $<TARGET_FILE:nid_patcher>)
-    endif()
-    add_test_executable(patched_libraries_tests tests/PatchedLibraries.cpp)
-    add_dependencies(patched_libraries_tests libs)
-    if(MINGW)
-        target_compile_options(patched_libraries_tests PRIVATE -fasynchronous-unwind-tables)
-        target_link_options(patched_libraries_tests PRIVATE -static -static-libgcc -static-libstdc++)
-    endif()
-    add_test(NAME patched_libraries COMMAND patched_libraries_tests ${PATCHED_DIR})
-    add_test_executable(guest_kernel_sys_tests tests/GuestKernelSys.cpp)
-    target_include_directories(guest_kernel_sys_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(guest_kernel_sys_tests PRIVATE libkernel_sys libkernel libc)
-    configure_windows_unwind(guest_kernel_sys_tests)
-    add_test(NAME guest_kernel_sys COMMAND guest_kernel_sys_tests)
+    set_target_properties(agc_shader_fusion_tests PROPERTIES EXCLUDE_FROM_ALL OFF)
+    add_test(NAME agc_shader_fusion COMMAND agc_shader_fusion_tests)
+    set_tests_properties(agc_shader_fusion PROPERTIES SKIP_RETURN_CODE 77)
     if(WIN32)
-        set_tests_properties(guest_kernel_sys PROPERTIES ENVIRONMENT_MODIFICATION
-            "PATH=path_list_prepend:$<TARGET_FILE_DIR:libkernel_sys>")
+        set_tests_properties(agc_shader_fusion PROPERTIES ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:$<TARGET_FILE_DIR:libc>")
     endif()
-    if(APPLE)
-        add_subdirectory(tests/write_watch)
-    endif()
+endif()
 
-    add_test_executable(guest_offline_imports_tests tests/GuestOfflineImports.cpp)
-    target_include_directories(guest_offline_imports_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(guest_offline_imports_tests PRIVATE libSceHttp libSceNpEntitlementAccess libSceRudp libc)
-    configure_windows_unwind(guest_offline_imports_tests)
-    add_test(NAME guest_offline_imports COMMAND guest_offline_imports_tests)
+add_test_executable(agc_context_state_size_tests EXCLUDE_FROM_ALL tests/ContextStateSize.cpp)
+target_include_directories(agc_context_state_size_tests PRIVATE ${LIBS_INCLUDE_DIR})
+target_link_libraries(agc_context_state_size_tests PRIVATE libSceAgc libc)
+configure_windows_unwind(agc_context_state_size_tests)
+if(BUILD_TESTING)
+    set_target_properties(agc_context_state_size_tests PROPERTIES EXCLUDE_FROM_ALL FALSE)
+    add_test(NAME agc_context_state_size_tests COMMAND agc_context_state_size_tests)
     if(WIN32)
-        set_tests_properties(guest_offline_imports PROPERTIES ENVIRONMENT_MODIFICATION
-            "PATH=path_list_prepend:$<TARGET_FILE_DIR:libSceHttp>")
+        set_tests_properties(agc_context_state_size_tests PROPERTIES ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:$<TARGET_FILE_DIR:libc>")
     endif()
+endif()
 
-    add_test_executable(guest_rudp_status_tests tests/GuestRudpStatus.cpp)
-    target_include_directories(guest_rudp_status_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(guest_rudp_status_tests PRIVATE libSceRudp libc)
-    configure_windows_unwind(guest_rudp_status_tests)
-    add_test(NAME guest_rudp_status COMMAND guest_rudp_status_tests)
+add_test_executable(agc_interpolant_mapping_tests EXCLUDE_FROM_ALL
+        tests/InterpolantMapping.cpp
+        Shader/src/InterpolantMapping.cpp
+        Shader/src/ShaderUtils.cpp
+)
+target_include_directories(agc_interpolant_mapping_tests PRIVATE ${LIBS_INCLUDE_DIR})
+target_link_libraries(agc_interpolant_mapping_tests PRIVATE libSceAgcDriver libc)
+set_target_properties(agc_interpolant_mapping_tests PROPERTIES CXX_EXTENSIONS OFF)
+configure_windows_unwind(agc_interpolant_mapping_tests)
+
+if(BUILD_TESTING)
+    set_target_properties(agc_interpolant_mapping_tests PROPERTIES EXCLUDE_FROM_ALL OFF)
+    add_test(NAME agc_interpolant_mapping COMMAND agc_interpolant_mapping_tests)
     if(WIN32)
-        set_tests_properties(guest_rudp_status PROPERTIES ENVIRONMENT_MODIFICATION
-            "PATH=path_list_prepend:$<TARGET_FILE_DIR:libSceRudp>")
+        set_tests_properties(agc_interpolant_mapping PROPERTIES ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:$<TARGET_FILE_DIR:libc>")
     endif()
+endif()
 
-    add_test_executable(guest_memory_pool_stats_tests tests/GuestMemoryPoolStats.cpp)
-    target_include_directories(guest_memory_pool_stats_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(guest_memory_pool_stats_tests PRIVATE libSceSsl libSceHttp2 libSceNet libkernel libc)
-    configure_windows_unwind(guest_memory_pool_stats_tests)
-    add_test(NAME guest_memory_pool_stats COMMAND guest_memory_pool_stats_tests)
+if(BUILD_TESTING)
+    add_test_executable(guest_shader_link_tests
+            ${LIBS_INCLUDE_DIR}/tests/GuestShaderLink.cpp
+            Shader/src/LinkShaders.cpp
+            Shader/src/PrimState.cpp
+            Shader/src/InterpolantMapping.cpp
+            Shader/src/ShaderUtils.cpp
+    )
+    target_include_directories(guest_shader_link_tests PRIVATE ${LIBS_INCLUDE_DIR})
+    target_link_libraries(guest_shader_link_tests PRIVATE libSceAgc libSceAgcDriver libc)
+    configure_windows_unwind(guest_shader_link_tests)
+    add_test(NAME guest_shader_link COMMAND guest_shader_link_tests)
     if(WIN32)
-        set_tests_properties(guest_memory_pool_stats PROPERTIES ENVIRONMENT_MODIFICATION
-            "PATH=path_list_prepend:$<TARGET_FILE_DIR:libSceSsl>")
+        set_tests_properties(guest_shader_link PROPERTIES ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:$<TARGET_FILE_DIR:libc>")
     endif()
+endif()
 
-    add_test_executable(guest_system_gesture_tests tests/GuestSystemGesture.cpp)
-    target_include_directories(guest_system_gesture_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(guest_system_gesture_tests PRIVATE libSceSystemGesture libc)
-    configure_windows_unwind(guest_system_gesture_tests)
-    add_test(NAME guest_system_gesture COMMAND guest_system_gesture_tests)
+add_test_executable(agc_gs_oversubscription_tests EXCLUDE_FROM_ALL
+        tests/GsOversubscription.cpp
+        Shader/src/GsOversubscription.cpp
+)
+target_include_directories(agc_gs_oversubscription_tests PRIVATE ${LIBS_INCLUDE_DIR})
+target_link_libraries(agc_gs_oversubscription_tests PRIVATE libc)
+configure_windows_unwind(agc_gs_oversubscription_tests)
+if(BUILD_TESTING)
+    set_target_properties(agc_gs_oversubscription_tests PROPERTIES EXCLUDE_FROM_ALL FALSE)
+    add_test(NAME agc_gs_oversubscription_tests COMMAND agc_gs_oversubscription_tests)
     if(WIN32)
-        set_tests_properties(guest_system_gesture PROPERTIES ENVIRONMENT_MODIFICATION
-            "PATH=path_list_prepend:$<TARGET_FILE_DIR:libSceSystemGesture>")
+        set_tests_properties(agc_gs_oversubscription_tests PROPERTIES ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:$<TARGET_FILE_DIR:libc>")
     endif()
+endif()
 
-    if(UNIX AND (CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64)$" OR CMAKE_OSX_ARCHITECTURES STREQUAL "x86_64"))
-        add_subdirectory(tests/register_context)
-    endif()
-
-    add_test_executable(savedata_memory_metadata_tests tests/SaveDataMemoryMetadata.cpp)
-    target_include_directories(savedata_memory_metadata_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(savedata_memory_metadata_tests PRIVATE libSceSaveData.native)
-    configure_windows_unwind(savedata_memory_metadata_tests)
-    add_test(NAME savedata_memory_metadata COMMAND savedata_memory_metadata_tests)
-    if(MINGW)
-        target_compile_options(savedata_memory_metadata_tests PRIVATE -fasynchronous-unwind-tables)
-    endif()
+add_test_executable(agc_dma_data_tests EXCLUDE_FROM_ALL
+        tests/DmaData.cpp
+        Command/src/Packet.cpp
+        Command/src/Memory.cpp
+        Acb/src/Memory.cpp
+        DcbFlow/src/Memory.cpp
+)
+target_include_directories(agc_dma_data_tests PRIVATE ${LIBS_INCLUDE_DIR})
+target_link_libraries(agc_dma_data_tests PRIVATE libc)
+configure_windows_unwind(agc_dma_data_tests)
+if(BUILD_TESTING)
+    set_target_properties(agc_dma_data_tests PROPERTIES EXCLUDE_FROM_ALL FALSE)
+    add_test(NAME agc_dma_data_tests COMMAND agc_dma_data_tests)
     if(WIN32)
-        set_tests_properties(savedata_memory_metadata PROPERTIES
-            ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:libSceSaveData.native>")
+        set_tests_properties(agc_dma_data_tests PROPERTIES ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:$<TARGET_FILE_DIR:libc>")
     endif()
-    add_test_executable(savedata_memory_growth_tests tests/SaveDataMemoryGrowth.cpp)
-    target_include_directories(savedata_memory_growth_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(savedata_memory_growth_tests PRIVATE libSceSaveData.native)
-    configure_windows_unwind(savedata_memory_growth_tests)
-    if(MINGW)
-        target_compile_options(savedata_memory_growth_tests PRIVATE -fasynchronous-unwind-tables)
-    endif()
-    add_test(NAME savedata_memory_growth COMMAND savedata_memory_growth_tests)
-    add_test(NAME savedata_memory_growth_read_failure COMMAND savedata_memory_growth_tests read-failure)
-    set_tests_properties(savedata_memory_growth_read_failure PROPERTIES SKIP_RETURN_CODE 77)
+endif()
+
+add_test_executable(agc_write_data_patch_tests EXCLUDE_FROM_ALL
+        tests/WriteDataPatch.cpp
+        Command/src/Packet.cpp
+        Command/src/Memory.cpp
+        Acb/src/Memory.cpp
+        DcbFlow/src/Memory.cpp
+        Patch/src/WaitRegMem.cpp
+)
+target_include_directories(agc_write_data_patch_tests PRIVATE ${LIBS_INCLUDE_DIR})
+target_link_libraries(agc_write_data_patch_tests PRIVATE libc)
+configure_windows_unwind(agc_write_data_patch_tests)
+if(BUILD_TESTING)
+    set_target_properties(agc_write_data_patch_tests PROPERTIES EXCLUDE_FROM_ALL FALSE)
+    add_test(NAME agc_write_data_patch_tests COMMAND agc_write_data_patch_tests)
     if(WIN32)
-        set_tests_properties(savedata_memory_growth savedata_memory_growth_read_failure PROPERTIES
-            ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:libSceSaveData.native>")
+        set_tests_properties(agc_write_data_patch_tests PROPERTIES ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:$<TARGET_FILE_DIR:libc>")
     endif()
-    add_library(host_thread_local_test_library SHARED tests/HostThreadLocalLibrary.cpp)
-    set_target_properties(host_thread_local_test_library PROPERTIES RUNTIME_OUTPUT_DIRECTORY "$<1:${ANYPS5_TEST_OUTPUT_DIRECTORY}>")
-    target_include_directories(host_thread_local_test_library PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    add_test_executable(host_thread_local_tests tests/HostThreadLocal.cpp)
-    target_link_libraries(host_thread_local_tests PRIVATE host_thread_local_test_library)
-    if(MINGW)
-        target_compile_options(host_thread_local_test_library PRIVATE -fasynchronous-unwind-tables)
-        target_compile_options(host_thread_local_tests PRIVATE -fasynchronous-unwind-tables)
-    endif()
-    add_test(NAME host_thread_local COMMAND host_thread_local_tests)
-    set_tests_properties(host_thread_local PROPERTIES TIMEOUT 15)
+endif()
 
-    add_test_executable(savedata_core_write_replacement_tests tests/SaveDataWriteReplacement.cpp)
-    target_include_directories(savedata_core_write_replacement_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(savedata_core_write_replacement_tests PRIVATE libSceSaveData)
-    configure_windows_unwind(savedata_core_write_replacement_tests)
-    add_test(NAME savedata_core_write_replacement COMMAND savedata_core_write_replacement_tests)
-
-    add_test_executable(savedata_native_write_replacement_tests tests/SaveDataWriteReplacement.cpp)
-    target_include_directories(savedata_native_write_replacement_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_compile_definitions(savedata_native_write_replacement_tests PRIVATE SAVEDATA_NATIVE_BACKEND)
-    target_link_libraries(savedata_native_write_replacement_tests PRIVATE libSceSaveData.native)
-    configure_windows_unwind(savedata_native_write_replacement_tests)
-    add_test(NAME savedata_native_write_replacement COMMAND savedata_native_write_replacement_tests)
-
-    add_test_executable(savedata_replace_file_failure_tests tests/SaveDataFileWriteFailure.cpp)
-    target_include_directories(savedata_replace_file_failure_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    configure_windows_unwind(savedata_replace_file_failure_tests)
-    add_test(NAME savedata_replace_file_failure COMMAND savedata_replace_file_failure_tests)
-
-    if(MINGW)
-        target_compile_options(savedata_core_write_replacement_tests PRIVATE -fasynchronous-unwind-tables)
-        target_compile_options(savedata_native_write_replacement_tests PRIVATE -fasynchronous-unwind-tables)
-        target_compile_options(savedata_replace_file_failure_tests PRIVATE -fasynchronous-unwind-tables)
-    endif()
+add_test_executable(agc_prime_utcl2_tests EXCLUDE_FROM_ALL
+        tests/PrimeUtcl2.cpp
+        Command/src/Packet.cpp
+        Command/src/Memory.cpp
+        Acb/src/Memory.cpp
+        DcbFlow/src/Memory.cpp
+        DcbState/src/Display.cpp
+)
+target_include_directories(agc_prime_utcl2_tests PRIVATE ${LIBS_INCLUDE_DIR})
+target_link_libraries(agc_prime_utcl2_tests PRIVATE libc)
+configure_windows_unwind(agc_prime_utcl2_tests)
+if(BUILD_TESTING)
+    set_target_properties(agc_prime_utcl2_tests PROPERTIES EXCLUDE_FROM_ALL FALSE)
+    add_test(NAME agc_prime_utcl2_tests COMMAND agc_prime_utcl2_tests)
     if(WIN32)
-        set_tests_properties(savedata_core_write_replacement PROPERTIES ENVIRONMENT_MODIFICATION
-            "PATH=path_list_prepend:$<TARGET_FILE_DIR:libSceSaveData>")
-        set_tests_properties(savedata_native_write_replacement PROPERTIES ENVIRONMENT_MODIFICATION
-            "PATH=path_list_prepend:$<TARGET_FILE_DIR:libSceSaveData.native>")
+        set_tests_properties(agc_prime_utcl2_tests PROPERTIES ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:$<TARGET_FILE_DIR:libc>")
     endif()
+endif()
 
-    add_test_executable(guest_posix_random_tests tests/GuestPosixRandom.cpp)
-    target_include_directories(guest_posix_random_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(guest_posix_random_tests PRIVATE libScePosixForWebKit)
-    configure_windows_unwind(guest_posix_random_tests)
-    add_test(NAME guest_posix_random COMMAND guest_posix_random_tests)
+add_test_executable(agc_cond_exec_patch_tests EXCLUDE_FROM_ALL
+        tests/CondExecPatch.cpp
+        Command/src/Packet.cpp
+        Command/src/Memory.cpp
+        Command/src/Control.cpp
+        DcbFlow/src/Sync.cpp
+        Acb/src/Sync.cpp
+        Patch/src/CondExec.cpp
+)
+target_include_directories(agc_cond_exec_patch_tests PRIVATE ${LIBS_INCLUDE_DIR})
+target_link_libraries(agc_cond_exec_patch_tests PRIVATE libc)
+configure_windows_unwind(agc_cond_exec_patch_tests)
+if(BUILD_TESTING)
+    set_target_properties(agc_cond_exec_patch_tests PROPERTIES EXCLUDE_FROM_ALL FALSE)
+    add_test(NAME agc_cond_exec_patch_tests COMMAND agc_cond_exec_patch_tests)
     if(WIN32)
-        set_tests_properties(guest_posix_random PROPERTIES ENVIRONMENT_MODIFICATION
-            "PATH=path_list_prepend:$<TARGET_FILE_DIR:libScePosixForWebKit>")
+        set_tests_properties(agc_cond_exec_patch_tests PROPERTIES ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:$<TARGET_FILE_DIR:libc>")
+    endif()
+endif()
+
+add_test_executable(agc_shader_helpers_tests EXCLUDE_FROM_ALL
+        tests/ShaderHelpers.cpp
+        Shader/src/LinkShaders.cpp
+        Shader/src/PrimState.cpp
+        Shader/src/InterpolantMapping.cpp
+        Shader/src/ShaderUtils.cpp
+)
+target_include_directories(agc_shader_helpers_tests PRIVATE ${LIBS_INCLUDE_DIR})
+target_link_libraries(agc_shader_helpers_tests PRIVATE libc libSceAgcDriver)
+configure_windows_unwind(agc_shader_helpers_tests)
+if(BUILD_TESTING)
+    set_target_properties(agc_shader_helpers_tests PROPERTIES EXCLUDE_FROM_ALL FALSE)
+    add_test(NAME agc_shader_helpers COMMAND agc_shader_helpers_tests)
+    if(WIN32)
+        set_tests_properties(agc_shader_helpers PROPERTIES ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:$<TARGET_FILE_DIR:libc>")
     endif()
 endif()
